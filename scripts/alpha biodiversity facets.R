@@ -9,6 +9,7 @@ library(rnaturalearth)
 library(terra)
 library(FD) # Fdisp
 library(picante) # pd (Faith), mpd
+library(SpatialPack) # modified.ttest
 
 
 # load data for analyses
@@ -261,5 +262,51 @@ for (s in 1:dim(alpha_div_rasters)[3]) {
 }
 
 
+
+# alpha diversity ~ climate ####
+
+# response variables 
+alphadiv <- rast('results/alpha_div_rasters.tiff')[[1:9]]
+names(alphadiv)
+
+# bioclim
+wc_bioclim <- list.files('C:/Users/user/Desktop/wc2.1_30s_bio', full.names=T)[-which(list.files('C:/Users/user/Desktop/wc2.1_30s_bio', full.names=T)=="C:/Users/user/Desktop/wc2.1_30s_bio/variables.txt")] %>% rast()
+names(wc_bioclim) <- substr(names(wc_bioclim), 11, 16)
+
+rs_wc_bioclim <- wc_bioclim[[names(wc_bioclim)%in%c('bio_1','bio_6','bio_7','bio_12','bio_13','bio_15')]] %>%
+  aggregate(fact=15, fun="mean") %>% # aggregate to reduce computation time
+  project('+proj=eqearth') %>% # project
+  resample(y=alphadiv[[1]], method='average') # resample
+
+alphadiv_bioclim <- c(alphadiv, rs_wc_bioclim) # group rasters
+
+df_alphadiv_bioclim <- alphadiv_bioclim %>% as.data.frame(xy=TRUE) %>% # convert into dataframe
+  na.omit() %>% subset(CWM_height > 0) # remove NAs and zeros
+
+# par(mfrow=c(1,1), mar=c(5,5,5,5))
+# plot(CWM_height ~ bio_1, data=df_CWM_bioclim); abline(lm(CWM_height ~ bio_1, data=df_CWM_bioclim), col='blue', lwd=3)
+
+test_alphadiv_bioclim <- matrix(ncol=6, nrow=dim(alphadiv)[3]*6) %>% as.data.frame()
+colnames(test_alphadiv_bioclim) <- c('ALPHA', 'BIOCLIM', 'F_', 'DF', 'R', 'P_value')
+test_alphadiv_bioclim$ALPHA <- rep(names(alphadiv), 6)
+test_alphadiv_bioclim$BIOCLIM <- c( rep('bio_1',9), rep('bio_6',9), rep('bio_7',9),
+                                    rep('bio_12',9), rep('bio_13',9), rep('bio_15',9))
+                                    
+for (i in 1:nrow(test_alphadiv_bioclim)) {
+  
+  modtest1 <- modified.ttest(df_alphadiv_bioclim[,test_alphadiv_bioclim$ALPHA[i]],
+                             df_alphadiv_bioclim[,test_alphadiv_bioclim$BIOCLIM[i]],
+                             df_alphadiv_bioclim[,c('x','y')], nclass=13)
+  
+  test_alphadiv_bioclim$F_[i] <- modtest1$Fstat
+  test_alphadiv_bioclim$DF[i] <- modtest1$dof
+  test_alphadiv_bioclim$R[i] <- modtest1$corr
+  test_alphadiv_bioclim$P_value[i] <- modtest1$p.value
+  
+  print(paste('--- ', round(i/nrow(test_alphadiv_bioclim),2)*100,'% ---', sep=''))
+  
+}
+
+write.csv(test_alphadiv_bioclim, 'results/test_alphadiv_bioclim.csv')
 
 

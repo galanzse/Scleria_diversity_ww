@@ -7,7 +7,6 @@ library(tidyverse); library(ggpubr)
 library(terra)
 library(randomForest)
 library(caret); library(caTools)
-library(SpatialPack) # modified.ttest
 
 load("C:/Users/user/OneDrive/PUBLICACIONES/SCLERIA/Scleria_EDGE/results/data_final.RData")
 
@@ -118,49 +117,5 @@ plot(varImp(rf_random, scale=F))
 # confusion matrix
 predicted_class <- predict(rf_random, newdata=data_ex[,v_vars], type='raw')
 confusionMatrix(data=predicted_class, reference=as.factor(data_ex$subgenus))
-
-
-
-# CWM ~ climate ####
-
-# CWM 
-CWM <- rast('results/alpha_div_rasters.tiff')[[c('CWM_height', 'CWM_bladearea', 'CWM_nutletvolume')]]
-
-# bioclim
-rs_wc_bioclim <- wc_bioclim[[names(wc_bioclim)%in%c('bio_1','bio_6','bio_7','bio_12','bio_13','bio_15')]] %>%
-  aggregate(fact=15, fun="mean") # aggregate to reduce computation time
-
-cellSize(rs_wc_bioclim, unit='km')
-
-rs_wc_bioclim <- rs_wc_bioclim %>%
-  project('+proj=eqearth') %>% # project
-  resample(y=CWM[[1]], method='average') # resample
-
-CWM_bioclim <- c(CWM, rs_wc_bioclim) # group rasters
-
-df_CWM_bioclim <- CWM_bioclim %>% as.data.frame(xy=TRUE) %>% # convert into dataframe
-  na.omit() %>% subset(CWM_height > 0) # remove NAs and zeros
-
-# par(mfrow=c(1,1), mar=c(5,5,5,5))
-# plot(CWM_height ~ bio_1, data=df_CWM_bioclim); abline(lm(CWM_height ~ bio_1, data=df_CWM_bioclim), col='blue', lwd=3)
-
-test_CWM_bioclim <- matrix(ncol=6, nrow=3*6) %>% as.data.frame()
-colnames(test_CWM_bioclim) <- c('CWM', 'BIOCLIM', 'F_', 'DF', 'R', 'P_value')
-test_CWM_bioclim$CWM <- c(rep('CWM_height',6), rep('CWM_bladearea',6), rep('CWM_nutletvolume',6))
-test_CWM_bioclim$BIOCLIM <- rep(c('bio_1','bio_6','bio_7','bio_12','bio_13','bio_15'), 3)
-
-for (i in 1:nrow(test_CWM_bioclim)) {
-  
-  modtest1 <- modified.ttest(df_CWM_bioclim[,test_CWM_bioclim$CWM[i]], df_CWM_bioclim[,test_CWM_bioclim$BIOCLIM[i]],
-                             df_CWM_bioclim[,c('x','y')], nclass=13)
-  
-  test_CWM_bioclim$F_[i] <- modtest1$Fstat
-  test_CWM_bioclim$DF[i] <- modtest1$dof
-  test_CWM_bioclim$R[i] <- modtest1$corr
-  test_CWM_bioclim$P_value[i] <- modtest1$p.value
-  
-  print(paste('--- ', round(i/nrow(test_CWM_bioclim),2)*100,'% ---', sep=''))
-  
-}
 
 
