@@ -6,8 +6,10 @@
 
 library(tidyverse)
 library(rnaturalearth)
+library(cluster)
 library(terra)
 library(FD) # Fdisp
+library(BAT)
 library(picante) # pd (Faith), mpd
 library(SpatialPack) # modified.ttest
 
@@ -23,17 +25,16 @@ load("results/global_pool_list.Rdata")
 load("results/regional_pool_list.Rdata")
 
 
-
 # compute alpha diversity and trait means ####
 
 # unique cells
-scl_occurrences$cell <- extract(world_grid, scl_points, cells=TRUE) %>% dplyr::select(cell) %>% deframe()
-scl_occurrences$BIOMExREALM <- extract(rast_ecoregions, scl_points, cells=TRUE) %>% # info regional pools
+scl_occurrences$cell <- terra::extract(world_grid, scl_points, cells=TRUE) %>% dplyr::select(cell) %>% deframe()
+scl_occurrences$BIOMExREALM <- terra::extract(rast_ecoregions, scl_points, cells=TRUE) %>% # info regional pools
   dplyr::select(REALMxBIOME) %>% deframe()
 scl_indices <- scl_occurrences %>% dplyr::select(cell, BIOMExREALM) %>% unique()
 
 table(is.na(scl_indices$BIOMExREALM)) # NAs in regional pool
-scl_indices$BIOMExREALM[which(!(scl_indices$BIOMExREALM %in% ecoregions$REALMxBIOME))] %>% unique()
+# scl_indices$BIOMExREALM[which(!(scl_indices$BIOMExREALM %in% ecoregions$REALMxBIOME))] %>% unique()
 scl_indices$BIOMExREALM[scl_indices$BIOMExREALM %in% c('AT98','AA14','NA2','PA13','NA98')] <- NA
 
 # site x species presence matrix to subset communities from
@@ -67,7 +68,7 @@ scl_indices$SES_mpd_rg <- NA #
 
 
 # loop
-for (cl in 1877:nrow(scl_indices)) {
+for (cl in 118:nrow(scl_indices)) {
   
   cell_spp <- scl_occurrences %>% subset(cell==scl_indices$cell[cl]) %>%
     dplyr::select(scientific_name) %>% unique() %>% deframe()
@@ -106,14 +107,10 @@ for (cl in 1877:nrow(scl_indices)) {
   scl_indices$cwm_nutlet[cl] <- mean(cell_CWM$nutlet_volume)
 
 
-  # Convex Hull & Fdisp
-  scl_dist <- scl_traits[cell_spp,]
   if (length(cell_spp)>1) {
-      scl_dist <- daisy(as.matrix(scl_dist), metric='gower',
-                    type=list('factor'='life_form_simp','numeric'=c('height','blade_area','nutlet_volume')))
-      tempFD <- dbFD(x=scl_dist, stand.FRic=F, messages=F, calc.FGR=F, calc.CWM=F, calc.FDiv=F)
-      scl_indices$Frich_[cl] <- tempFD$FRic
-      scl_indices$Fdisp_[cl] <- tempFD$FDis
+    scl_indices$Frich_[cl] <- alpha(cell_comm, scl_dendrogram) # Frich
+    tempFD <- as.matrix(scl_dist)[cell_spp,cell_spp] %>% as.dist() %>% dbFD(stand.FRic=F, messages=F, calc.FGR=F, calc.CWM=F, calc.FDiv=F)
+    scl_indices$Fdisp_[cl] <- tempFD$FDis # Fdisp
   }
   
   # # calculate average Faith and mpd from imputed trees
@@ -140,16 +137,16 @@ for (cl in 1877:nrow(scl_indices)) {
     
     
     # standardized effect size: REGIONAL POOL
-    if (!(is.na(scl_indices$BIOMExREALM[cl]))) {
-      pool2 <- regional_pool_list[[as.character(scl_indices$BIOMExREALM[cl])]]
-      if (!(is.null(pool2))) { # some rare pools are absent
-        pool2 <- pool2[[as.character(scl_indices$richness[cl])]]
-        percentile <- ecdf(pool2$Frich_); scl_indices$SES_Frich_rg[cl] <- percentile(scl_indices$Frich_[cl])
-        percentile <- ecdf(pool2$Fdisp_); scl_indices$SES_Fdisp_rg[cl] <- percentile(scl_indices$Fdisp_[cl])
-        percentile <- ecdf(pool2$Faith_); scl_indices$SES_Faith_rg[cl] <- percentile(scl_indices$Faith_[cl])
-        percentile <- ecdf(pool2$mpd_); scl_indices$SES_mpd_rg[cl] <- percentile(scl_indices$mpd_[cl])
-      }
-    }
+    # if (!(is.na(scl_indices$BIOMExREALM[cl]))) {
+    #   pool2 <- regional_pool_list[[as.character(scl_indices$BIOMExREALM[cl])]]
+    #   if (!(is.null(pool2))) { # some rare pools are absent
+    #     pool2 <- pool2[[as.character(scl_indices$richness[cl])]]
+    #     percentile <- ecdf(pool2$Frich_); scl_indices$SES_Frich_rg[cl] <- percentile(scl_indices$Frich_[cl])
+    #     percentile <- ecdf(pool2$Fdisp_); scl_indices$SES_Fdisp_rg[cl] <- percentile(scl_indices$Fdisp_[cl])
+    #     percentile <- ecdf(pool2$Faith_); scl_indices$SES_Faith_rg[cl] <- percentile(scl_indices$Faith_[cl])
+    #     percentile <- ecdf(pool2$mpd_); scl_indices$SES_mpd_rg[cl] <- percentile(scl_indices$mpd_[cl])
+    #   }
+    # }
   }
   
   
@@ -186,10 +183,10 @@ map_Fdisp_SESgl <- world_grid; names(map_Fdisp_SESgl) <- 'SES_Fdisp_gl'
 map_Faith_SESgl <- world_grid; names(map_Faith_SESgl) <- 'SES_Faith_gl'
 map_mpd_SESgl <- world_grid; names(map_mpd_SESgl) <- 'SES_mpd_gl'
 
-map_Frich_SESrg <- world_grid; names(map_Frich_SESrg) <- 'SES_Frich_rg' #   SES REGIONAL
-map_Fdisp_SESrg <- world_grid; names(map_Fdisp_SESrg) <- 'SES_Fdisp_rg'
-map_Faith_SESrg <- world_grid; names(map_Faith_SESrg) <- 'SES_Faith_rg'
-map_mpd_SESrg <- world_grid; names(map_mpd_SESrg) <- 'SES_mpd_rg'
+# map_Frich_SESrg <- world_grid; names(map_Frich_SESrg) <- 'SES_Frich_rg' #   SES REGIONAL
+# map_Fdisp_SESrg <- world_grid; names(map_Fdisp_SESrg) <- 'SES_Fdisp_rg'
+# map_Faith_SESrg <- world_grid; names(map_Faith_SESrg) <- 'SES_Faith_rg'
+# map_mpd_SESrg <- world_grid; names(map_mpd_SESrg) <- 'SES_mpd_rg'
 
 
 

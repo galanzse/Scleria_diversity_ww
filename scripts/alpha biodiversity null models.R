@@ -5,6 +5,7 @@
 
 library(tidyverse)
 library(cluster)
+library(BAT)
 library(FD) # Fdisp
 library(randtip) # imputation
 library(picante) # pd (Faith), mpd
@@ -49,12 +50,9 @@ for (r in 1:length(scl_vrich)) { # for every observed richness value
     # presence matrix
     cell_comm <- t(as.matrix(scl_presences[1,cell_spp]))
     
-    # Convex Hull & Fdisp
-    scl_dist <- scl_traits[cell_spp,]
-    scl_dist <- daisy(as.matrix(scl_dist), metric='gower',
-                      type=list('factor'='life_form_simp','numeric'=c('height','blade_area','nutlet_volume')))
-    tempFD <- dbFD(x=scl_dist, stand.FRic=F, messages=F, calc.FGR=F, calc.CWM=F, calc.FDiv=F)
-    Matnull$Frich_[n] <- tempFD$FRic
+    # Frich & Fdisp
+    Matnull$Frich_[n] <- alpha(cell_comm, scl_dendrogram)
+    tempFD <- as.matrix(scl_dist)[cell_spp,cell_spp] %>% as.dist() %>% dbFD(stand.FRic=F, messages=F, calc.FGR=F, calc.CWM=F, calc.FDiv=F)
     Matnull$Fdisp_[n] <- tempFD$FDis
     
     # calculate average Faith and mpd from imputed trees
