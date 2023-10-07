@@ -19,23 +19,23 @@ source('scripts/import data alpha and beta diversity calc.R')
 
 
 # null models and BIOMExREALM id
-regional_pools <- read.csv("results/regional_pools.txt", sep="")
-rast_ecoregions <- rast('results/rast_ecoregions.tiff')
+# regional_pools <- read.csv("results/regional_pools.txt", sep="")
+# rast_ecoregions <- rast('results/rast_ecoregions.tiff')
 load("results/global_pool_list.Rdata")
-load("results/regional_pool_list.Rdata")
+# load("results/regional_pool_list.Rdata")
 
 
 # compute alpha diversity and trait means ####
 
 # unique cells
 scl_occurrences$cell <- terra::extract(world_grid, scl_points, cells=TRUE) %>% dplyr::select(cell) %>% deframe()
-scl_occurrences$BIOMExREALM <- terra::extract(rast_ecoregions, scl_points, cells=TRUE) %>% # info regional pools
-  dplyr::select(REALMxBIOME) %>% deframe()
-scl_indices <- scl_occurrences %>% dplyr::select(cell, BIOMExREALM) %>% unique()
+# scl_occurrences$BIOMExREALM <- terra::extract(rast_ecoregions, scl_points, cells=TRUE) %>% # info regional pools
+#   dplyr::select(REALMxBIOME) %>% deframe()
+scl_indices <- scl_occurrences %>% dplyr::select(cell) %>% unique() # BIOMExREALM
 
-table(is.na(scl_indices$BIOMExREALM)) # NAs in regional pool
+# table(is.na(scl_indices$BIOMExREALM)) # NAs in regional pool
 # scl_indices$BIOMExREALM[which(!(scl_indices$BIOMExREALM %in% ecoregions$REALMxBIOME))] %>% unique()
-scl_indices$BIOMExREALM[scl_indices$BIOMExREALM %in% c('AT98','AA14','NA2','PA13','NA98')] <- NA
+# scl_indices$BIOMExREALM[scl_indices$BIOMExREALM %in% c('AT98','AA14','NA2','PA13','NA98')] <- NA
 
 # site x species presence matrix to subset communities from
 scl_presences <- matrix(ncol=nrow(scl_traits), nrow=1)
@@ -61,22 +61,24 @@ scl_indices$SES_Fdisp_gl <- NA #
 scl_indices$SES_Faith_gl <- NA #
 scl_indices$SES_mpd_gl <- NA #
 
-scl_indices$SES_Frich_rg <- NA #    SES REGIONAL
-scl_indices$SES_Fdisp_rg <- NA #
-scl_indices$SES_Faith_rg <- NA #
-scl_indices$SES_mpd_rg <- NA #
+# scl_indices$SES_Frich_rg <- NA #    SES REGIONAL
+# scl_indices$SES_Fdisp_rg <- NA #
+# scl_indices$SES_Faith_rg <- NA #
+# scl_indices$SES_mpd_rg <- NA #
 
 
 # loop
-for (cl in 118:nrow(scl_indices)) {
+for (cl in 1:nrow(scl_indices)) {
   
   cell_spp <- scl_occurrences %>% subset(cell==scl_indices$cell[cl]) %>%
     dplyr::select(scientific_name) %>% unique() %>% deframe()
   
+  # remove species not present in trait/phylogeny matrices
+  cell_spp <- cell_spp[which(cell_spp%in%colnames(scl_presences))]
+  
   # presence matrix
   cell_comm <- t(as.matrix(scl_presences[1,cell_spp]))
 
-  
   # taxonomic richness
   scl_indices$richness[cl] <- length(cell_spp)
 
@@ -115,7 +117,7 @@ for (cl in 118:nrow(scl_indices)) {
   
   # # calculate average Faith and mpd from imputed trees
   # # Xi=length(imputed_trees)
-  Xi=100
+  Xi=1000
   v_faith <- vector(length=Xi); v_faith[] <- NA
   v_mpd <- vector(length=Xi)
   for (p1 in 1:Xi) {
@@ -210,10 +212,10 @@ for (cl in 1:nrow(scl_indices)) {
   map_Faith_SESgl[scl_indices$cell[cl]] <- scl_indices$SES_Faith_gl[cl]
   map_mpd_SESgl[scl_indices$cell[cl]] <- scl_indices$SES_mpd_gl[cl]
   
-  map_Frich_SESrg[scl_indices$cell[cl]] <- scl_indices$SES_Frich_rg[cl]
-  map_Fdisp_SESrg[scl_indices$cell[cl]] <- scl_indices$SES_Fdisp_rg[cl]
-  map_Faith_SESrg[scl_indices$cell[cl]] <- scl_indices$SES_Faith_rg[cl]
-  map_mpd_SESrg[scl_indices$cell[cl]] <- scl_indices$SES_mpd_rg[cl]
+  # map_Frich_SESrg[scl_indices$cell[cl]] <- scl_indices$SES_Frich_rg[cl]
+  # map_Fdisp_SESrg[scl_indices$cell[cl]] <- scl_indices$SES_Fdisp_rg[cl]
+  # map_Faith_SESrg[scl_indices$cell[cl]] <- scl_indices$SES_Faith_rg[cl]
+  # map_mpd_SESrg[scl_indices$cell[cl]] <- scl_indices$SES_mpd_rg[cl]
   
   
   # progress
@@ -223,7 +225,7 @@ for (cl in 1:nrow(scl_indices)) {
 
 
 # save rasters
-# alpha_div_rasters <- c(map_richness, map_ann_per, map_cwm_height, map_cwm_blade, map_cwm_nutlet, map_Frich, map_Fdisp, map_Faith, map_mpd, map_Frich_SESgl, map_Fdisp_SESgl, map_Faith_SESgl, map_mpd_SESgl, map_Frich_SESrg, map_Fdisp_SESrg, map_Faith_SESrg, map_mpd_SESrg)
+# alpha_div_rasters <- c(map_richness, map_ann_per, map_cwm_height, map_cwm_blade, map_cwm_nutlet, map_Frich, map_Fdisp, map_Faith, map_mpd, map_Frich_SESgl, map_Fdisp_SESgl, map_Faith_SESgl, map_mpd_SESgl) # , map_Frich_SESrg, map_Fdisp_SESrg, map_Faith_SESrg, map_mpd_SESrg
 # writeRaster(alpha_div_rasters, 'results/alpha_div_rasters.tiff', overwrite=TRUE)
 
 
@@ -246,7 +248,7 @@ v_SES <- c("SES_Frich_gl","SES_Fdisp_gl","SES_Faith_gl","SES_mpd_gl","SES_Frich_
 # plot
 for (s in 1:dim(alpha_div_rasters)[3]) {
 
-    pdf(file = paste("C:/Users/user/Downloads/",names(alpha_div_rasters)[s],".pdf",sep=""),
+    pdf(file = paste("results/alpha diversity_150/",names(alpha_div_rasters)[s],".pdf",sep=""),
       width = 9.30, # The width of the plot in inches
       height = 5.74) # The height of the plot in inches
   
@@ -267,8 +269,9 @@ alphadiv <- rast('results/alpha_div_rasters.tiff')[[1:9]]
 names(alphadiv)
 
 # bioclim
-wc_bioclim <- list.files('C:/Users/user/Desktop/wc2.1_30s_bio', full.names=T)[-which(list.files('C:/Users/user/Desktop/wc2.1_30s_bio', full.names=T)=="C:/Users/user/Desktop/wc2.1_30s_bio/variables.txt")] %>% rast()
-names(wc_bioclim) <- substr(names(wc_bioclim), 11, 16)
+wc_bioclim <- list.files('C:/Users/javie/Desktop/world_rasters/wc2.1_2.5m', full.names=T) %>% rast()
+# [-which(list.files('C:/Users/user/Desktop/wc2.1_30s_bio', full.names=T)=="C:/Users/user/Desktop/wc2.1_30s_bio/variables.txt")]
+names(wc_bioclim) <- substr(names(wc_bioclim), 12, 17) #11, 16
 
 rs_wc_bioclim <- wc_bioclim[[names(wc_bioclim)%in%c('bio_1','bio_6','bio_7','bio_12','bio_13','bio_15')]] %>%
   aggregate(fact=15, fun="mean") %>% # aggregate to reduce computation time
