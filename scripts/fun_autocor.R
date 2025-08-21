@@ -1,16 +1,13 @@
 
 
-# Calculate Moran.I
+# autocor takes a spatraster and dataframe of occurrences and preapres the data to run ape::Moran.I
+# https://cran.r-project.org/web/packages/ape/vignettes/MoranI.pdf
 
 
 library(tidyverse)
 library(terra)
 library(ape) # moran.i
 library(geosphere) # distm
-
-
-# autocor takes a spatraster and dataframe of occurrences and calulates Moran's I
-# https://cran.r-project.org/web/packages/ape/vignettes/MoranI.pdf
 
 
 autocor <- function(raster = NULL, xy = NULL){

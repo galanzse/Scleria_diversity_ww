@@ -79,7 +79,7 @@ optimizeRR <- function(raster=NULL, occurrences=NULL, max_agg=NULL, aoi.I=NULL, 
     optimizeRR_out$sd_richness[r] <- temp %>% group_by(cell) %>%
       summarise(temp=n_distinct(species)) %>% dplyr::select(temp) %>% deframe() %>% sd()
     
-    # Estimate Moran.I for the entire dataset (retain one observation per species and cell)
+    # Estimate Moran.I for a given region the entire dataset ()
     if (aoi.I==TRUE) {
       temp <- data.frame(y=cen.I[1], x=cen.I[2]) %>%
         terra::vect(geom=c('x','y'), crs='epsg:4326') %>% terra::buffer(width=buff.i*1000)
@@ -89,10 +89,14 @@ optimizeRR <- function(raster=NULL, occurrences=NULL, max_agg=NULL, aoi.I=NULL, 
       temp <- occurrences[,c('x','y')]
     }
 
+    # retain one observation per species and cell using GeoThinneR::thin_points
     colnames(temp)[colnames(temp)=='y'] <- 'lat'; colnames(temp)[colnames(temp)=='x'] <- 'lon'
-    temp <- temp[thin_points(temp, method="distance", thin_dist=optimizeRR_out$sqrt_area[r])$retained[[1]],]
+    temp <- temp[GeoThinneR::thin_points(temp, method="distance", thin_dist=optimizeRR_out$sqrt_area[r])$retained[[1]],]
+    
+    # calculate Moran's I
     colnames(temp)[colnames(temp)=='lon'] <- 'x'; colnames(temp)[colnames(temp)=='lat'] <- 'y'
     optimizeRR_out$I_Moran[r] <- autocor(agg_raster_ll, temp)$observed
+    
     
     # progress
     print(paste('-- ', round(r/nrow(optimizeRR_out),2)*100, '% --' , sep=''))
