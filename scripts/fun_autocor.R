@@ -32,7 +32,7 @@ autocor <- function(raster = NULL, xy = NULL){
   
   # Moran's I 
   moran.i <- ape::Moran.I(xy.variables$var, xy.distancias, na.rm = TRUE)
-  print(moran.i)
+  # print(moran.i)
   
 }
 
