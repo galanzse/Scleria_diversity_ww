@@ -195,12 +195,13 @@ for (s1 in 1:nrow(summary_bestmodels)) { # 1:nrow(summary_bestmodels)
 
 
 # transform habitat suitability into presence based on reference grid ####
+# let's use 150*150km cells: contains 450 5*5km cells (approx.), thus we retains cells with min 450 obs + observations
 world_grid <- rast('results/world_grid.tiff')
+sqrt(cellSize(world_grid))
 
-# a 150*150km cell contains 900 5*5km cells (approx.), thus we retains cells with min 450 obs + observations
 filtered_suitable <- list()
 
-for (s1 in 57:length(suitable_locations)) {
+for (s1 in 106:length(suitable_locations)) {
 
   sp1 = unique(suitable_locations[[s1]]$scientific_name)
 
@@ -239,6 +240,15 @@ for (s1 in 57:length(suitable_locations)) {
 
 # collapse
 df_filtered_suitable <- do.call("rbind", filtered_suitable)
+
+# add original observations from other species
+temp <- scl_occurrences %>% subset(!(scientific_name%in%df_filtered_suitable$scientific_name))
+temp2 <- temp %>% vect(geom=c('x','y'), 'epsg:4326') %>% project('+proj=eqearth') %>%
+  geom(df=T) %>% dplyr::select(x,y)
+temp2$scientific_name <- temp$scientific_name
+
+# bind
+df_filtered_suitable <- rbind(df_filtered_suitable, temp2[,colnames(df_filtered_suitable)])
 
 # save
 save(filtered_suitable, file="results/filtered_suitable.RData")
